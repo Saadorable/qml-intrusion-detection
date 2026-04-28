@@ -14,19 +14,22 @@ import {
   type PacketRecord,
 } from "@/lib/trafficGenerator";
 
+type PanelView = "charts" | "logs" | "packet";
+
 export default function TrafficSimulator() {
   const [logs, setLogs] = useState<PacketRecord[]>([]);
   const [running, setRunning] = useState(false);
   const [selectedAttack, setSelectedAttack] = useState<AttackType | null>(null);
   const [burstSize, setBurstSize] = useState<BurstSize>(3);
   const [lastAction, setLastAction] = useState("System idle");
+  const [activeView, setActiveView] = useState<PanelView>("charts");
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const addPackets = (count: number, forcedLabel?: Label) => {
     const newPackets = Array.from({ length: count }, () => {
-        const actualLabel: Label =
-            forcedLabel ?? (selectedAttack && Math.random() < 0.65 ? selectedAttack : "Benign");
-        return buildPacket(actualLabel);
+      const actualLabel: Label =
+        forcedLabel ?? (selectedAttack && Math.random() < 0.65 ? selectedAttack : "Benign");
+      return buildPacket(actualLabel);
     });
 
     setLogs((prev) => [...newPackets, ...prev].slice(0, 20));
@@ -123,31 +126,78 @@ export default function TrafficSimulator() {
         />
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-        <TrafficControl
-          running={running}
-          lastAction={lastAction}
-          selectedAttack={selectedAttack}
-          burstSize={burstSize}
-          attackTypes={ATTACK_TYPES}
-          onStart={startTraffic}
-          onStop={stopTraffic}
-          onGenerateBenign={generateBenign}
-          onInjectAttack={injectAttack}
-          onClearAttack={clearAttack}
-          onBurstSizeChange={setBurstSize}
-        />
-
-        <PacketDetails latestPacket={latestPacket} />
-      </div>
-
-      <ChartsPanel
-        attackDistribution={attackDistribution}
-        correctnessData={correctnessData}
+      <TrafficControl
+        running={running}
+        lastAction={lastAction}
+        selectedAttack={selectedAttack}
+        burstSize={burstSize}
+        attackTypes={ATTACK_TYPES}
+        onStart={startTraffic}
+        onStop={stopTraffic}
+        onGenerateBenign={generateBenign}
+        onInjectAttack={injectAttack}
+        onClearAttack={clearAttack}
+        onBurstSizeChange={setBurstSize}
       />
 
-      <LiveLogs logs={logs} />
+      <section className="rounded-3xl border border-slate-800 bg-slate-900/70 p-5 shadow-2xl shadow-black/20 backdrop-blur">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-semibold">Dashboard views</h2>
+            <p className="mt-1 text-sm text-slate-400">
+              Switch between charts, logs, or packet details.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <ViewButton active={activeView === "charts"} onClick={() => setActiveView("charts")}>
+              Charts
+            </ViewButton>
+            <ViewButton active={activeView === "logs"} onClick={() => setActiveView("logs")}>
+              Live Logs
+            </ViewButton>
+            <ViewButton active={activeView === "packet"} onClick={() => setActiveView("packet")}>
+              Packet Details
+            </ViewButton>
+          </div>
+        </div>
+
+        {activeView === "charts" && (
+          <ChartsPanel
+            attackDistribution={attackDistribution}
+            correctnessData={correctnessData}
+          />
+        )}
+
+        {activeView === "logs" && <LiveLogs logs={logs} />}
+
+        {activeView === "packet" && <PacketDetails latestPacket={latestPacket} />}
+      </section>
     </div>
+  );
+}
+
+function ViewButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={[
+        "rounded-xl px-4 py-2 text-sm font-medium transition",
+        active
+          ? "bg-cyan-500 text-slate-950 shadow-lg shadow-cyan-500/20"
+          : "bg-slate-800 text-slate-300 hover:bg-slate-700",
+      ].join(" ")}
+    >
+      {children}
+    </button>
   );
 }
 

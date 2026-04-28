@@ -8,7 +8,7 @@ export default function Home() {
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="mb-8">
           <p className="text-sm uppercase tracking-[0.35em] text-cyan-400">
-            Full-Stack Intrusion Detection System
+            Intrusion Detection System
           </p>
           <h1 className="mt-3 text-4xl font-bold tracking-tight sm:text-5xl">
             Intrusion Detection Dashboard
