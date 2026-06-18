@@ -31,6 +31,7 @@ export type PacketRecord = {
   variance: number;
   weight: number;
   note: string;
+  features: Record<string, number>;
 };
 
 function randomInt(min: number, max: number) {
@@ -81,28 +82,21 @@ function makeProtocol(label: Label): Protocol {
   return pick(map[label]);
 }
 
-function makePrediction(actual: Label): {
-  predictedLabel: Label;
-  correct: boolean;
-  confidence: number;
-} {
-  const correctChance = actual === "Benign" ? 0.9 : 0.78;
-  const correct = Math.random() < correctChance;
-
-  if (correct) {
-    return {
-      predictedLabel: actual,
-      correct: true,
-      confidence: actual === "Benign" ? randomFloat(0.82, 0.99, 2) : randomFloat(0.7, 0.97, 2),
-    };
+function protocolToNumber(protocol: Protocol): number {
+  switch (protocol) {
+    case "ICMP":
+      return 1;
+    case "TCP":
+    case "HTTP":
+    case "HTTPS":
+    case "SSH":
+      return 6;
+    case "UDP":
+    case "DNS":
+      return 17;
+    default:
+      return 0;
   }
-
-  const alternatives: Label[] = ["Benign", ...ATTACK_TYPES].filter((x) => x !== actual) as Label[];
-  return {
-    predictedLabel: pick(alternatives),
-    correct: false,
-    confidence: randomFloat(0.45, 0.83, 2),
-  };
 }
 
 export function buildPacket(actualLabel: Label): PacketRecord {
@@ -110,10 +104,14 @@ export function buildPacket(actualLabel: Label): PacketRecord {
   const srcIp = malicious ? makeSuspiciousIp() : makePrivateIp();
   const dstIp = malicious ? makePublicServerIp() : "192.168.1.10";
   const protocol = makeProtocol(actualLabel);
-  const prediction = makePrediction(actualLabel);
 
-  const flowDuration = actualLabel === "Benign" ? randomFloat(120, 5000, 2) : randomFloat(8, 1200, 2);
-  const rate = actualLabel === "Benign" ? randomFloat(10, 300, 2) : randomFloat(300, 6500, 2);
+  const flowDuration = actualLabel === "Benign"
+    ? randomFloat(120, 5000, 2)
+    : randomFloat(8, 1200, 2);
+
+  const rate = actualLabel === "Benign"
+    ? randomFloat(10, 300, 2)
+    : randomFloat(300, 6500, 2);
 
   const synCount = malicious ? randomInt(5, 140) : randomInt(0, 12);
   const ackCount = malicious ? randomInt(0, 60) : randomInt(8, 180);
@@ -123,6 +121,34 @@ export function buildPacket(actualLabel: Label): PacketRecord {
   const dns = protocol === "DNS" ? randomInt(1, 8) : 0;
   const tcp = protocol === "TCP" || protocol === "SSH" || protocol === "HTTP" || protocol === "HTTPS" ? 1 : 0;
   const udp = protocol === "UDP" || protocol === "DNS" ? 1 : 0;
+
+  const packetSize = makePacketSize(actualLabel);
+  const iat = randomFloat(0.01, actualLabel === "Benign" ? 4.2 : 0.7, 3);
+  const variance = randomFloat(0.05, actualLabel === "Benign" ? 2.5 : 7.8, 3);
+  const weight = randomFloat(0.1, 1.0, 3);
+
+  const features = {
+    "flow_duration": flowDuration,
+    "Protocol Type": protocolToNumber(protocol),
+    "Tot size": packetSize,
+    "Tot sum": packetSize * randomInt(1, 4),
+    "Header_Length": randomInt(20, 80),
+    "AVG": randomInt(1, 255),
+    "Min": randomInt(1, 20),
+    "Max": randomInt(100, 1514),
+    "Variance": variance,
+    "Std": randomFloat(0.1, 10, 2),
+    "Magnitue": randomFloat(1, 100, 2),
+    "IAT": iat,
+    "Duration": flowDuration,
+    "syn_count": synCount,
+    "syn_flag_number": synCount > 0 ? 1 : 0,
+    "rst_count": randomInt(0, 2),
+    "urg_count": randomInt(0, 1),
+    "TCP": tcp,
+    "Number": randomInt(1, 20),
+    "Weight": weight,
+  };
 
   return {
     id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
@@ -142,10 +168,10 @@ export function buildPacket(actualLabel: Label): PacketRecord {
         : randomInt(1000, 9000),
     protocol,
     actualLabel,
-    predictedLabel: prediction.predictedLabel,
-    correct: prediction.correct,
-    confidence: prediction.confidence,
-    packetSize: makePacketSize(actualLabel),
+    predictedLabel: actualLabel,
+    correct: false,
+    confidence: 0,
+    packetSize,
     flowDuration,
     rate,
     synCount,
@@ -155,11 +181,12 @@ export function buildPacket(actualLabel: Label): PacketRecord {
     dns,
     tcp,
     udp,
-    iat: randomFloat(0.01, actualLabel === "Benign" ? 4.2 : 0.7, 3),
-    variance: randomFloat(0.05, actualLabel === "Benign" ? 2.5 : 7.8, 3),
-    weight: randomFloat(0.1, 1.0, 3),
+    iat,
+    variance,
+    weight,
     note: malicious
       ? `Suspicious flow from ${srcIp} toward ${dstIp}`
       : `Normal session from ${srcIp} toward ${dstIp}`,
+    features,
   };
 }

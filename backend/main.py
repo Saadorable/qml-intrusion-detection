@@ -1,3 +1,4 @@
+from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
 from typing import Dict, List
 
@@ -10,7 +11,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 # ============================================================
-# Paths / Config
+# Config
 # ============================================================
 BASE_DIR = Path(__file__).resolve().parent
 ARTIFACT_DIR = BASE_DIR / "deployment_artifacts"
@@ -18,10 +19,10 @@ ARTIFACT_DIR = BASE_DIR / "deployment_artifacts"
 N_QUBITS = 8
 N_LAYERS = 2
 
+MODEL_PATH = ARTIFACT_DIR / "best_qml_model.pt"
 SCALER_PATH = ARTIFACT_DIR / "scaler.pkl"
 LABEL_ENCODER_PATH = ARTIFACT_DIR / "label_encoder.pkl"
 SELECTED_FEATURES_PATH = ARTIFACT_DIR / "selected_features.pkl"
-MODEL_PATH = ARTIFACT_DIR / "best_qml_model.pt"
 
 device = torch.device("cpu")
 
@@ -90,7 +91,7 @@ class HybridCNNQML(nn.Module):
 
     def forward(self, x):
         x = x.to(device)
-        x = x.unsqueeze(1)  # [batch, 1, n_features]
+        x = x.unsqueeze(1)
         x = self.cnn(x)
         x = self.to_quantum(x)
         x = torch.tanh(x)
@@ -99,10 +100,9 @@ class HybridCNNQML(nn.Module):
         return x
 
 # ============================================================
-# Load trained weights
+# Load model
 # ============================================================
 model = HybridCNNQML(n_features=len(selected_features), n_classes=NUM_CLASSES)
-
 state_dict = torch.load(MODEL_PATH, map_location="cpu")
 model.load_state_dict(state_dict)
 model.eval()
@@ -111,6 +111,14 @@ model.eval()
 # FastAPI app
 # ============================================================
 app = FastAPI(title="IDS Hybrid QML API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class PredictionRequest(BaseModel):
     features: Dict[str, float]

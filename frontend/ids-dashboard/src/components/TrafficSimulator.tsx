@@ -1,5 +1,6 @@
 "use client";
 
+import { predictTraffic } from "@/lib/api";
 import { useEffect, useMemo, useRef, useState } from "react";
 import TrafficControl from "./TrafficControl";
 import ChartsPanel from "./ChartsPanel";
@@ -25,12 +26,26 @@ export default function TrafficSimulator() {
   const [activeView, setActiveView] = useState<PanelView>("charts");
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const addPackets = (count: number, forcedLabel?: Label) => {
-    const newPackets = Array.from({ length: count }, () => {
-      const actualLabel: Label =
-        forcedLabel ?? (selectedAttack && Math.random() < 0.65 ? selectedAttack : "Benign");
-      return buildPacket(actualLabel);
-    });
+  const addPackets = async (count: number, forcedLabel?: Label) => {
+    const newPackets = await Promise.all(
+      Array.from({ length: count }, async () => {
+        const actualLabel: Label =
+          forcedLabel ?? (selectedAttack && Math.random() < 0.65 ? selectedAttack : "Benign");
+
+        const packet = buildPacket(actualLabel);
+
+        const prediction = await predictTraffic(packet.features);
+
+        const predictedLabel = prediction.predicted_class as Label;
+
+        return {
+          ...packet,
+          predictedLabel,
+          correct: predictedLabel === packet.actualLabel,
+          confidence: Math.max(...prediction.probabilities),
+        };
+      })
+    );
 
     setLogs((prev) => [...newPackets, ...prev].slice(0, 20));
   };
@@ -41,7 +56,7 @@ export default function TrafficSimulator() {
     setLastAction("Live traffic started");
 
     intervalRef.current = setInterval(() => {
-      addPackets(1);
+      void addPackets(1);
     }, 1000);
   };
 
@@ -57,7 +72,7 @@ export default function TrafficSimulator() {
 
   const injectAttack = (attack: AttackType) => {
     setSelectedAttack(attack);
-    addPackets(burstSize, attack);
+    void addPackets(burstSize, attack);
     setLastAction(`Injected ${burstSize} ${attack} sample${burstSize > 1 ? "s" : ""}`);
   };
 
@@ -67,7 +82,7 @@ export default function TrafficSimulator() {
   };
 
   const generateBenign = () => {
-    addPackets(1, "Benign");
+    void addPackets(1, "Benign");
     setLastAction("Generated benign sample");
   };
 
