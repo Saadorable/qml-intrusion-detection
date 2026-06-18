@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Dict, List
 
 import joblib
+import os
 import numpy as np
 import pennylane as qml
 import torch
@@ -21,7 +22,7 @@ N_LAYERS = 2
 
 MODEL_PATH = ARTIFACT_DIR / "best_qml_model.pt"
 SCALER_PATH = ARTIFACT_DIR / "scaler.pkl"
-LABEL_ENCODER_PATH = ARTIFACT_DIR / "label_encoder.pkl"
+LABEL_ENCODER_PATH = ARTIFACT_DIR / "label_encoder.pkl"  # change if your file name is different
 SELECTED_FEATURES_PATH = ARTIFACT_DIR / "selected_features.pkl"
 
 device = torch.device("cpu")
@@ -32,6 +33,7 @@ device = torch.device("cpu")
 scaler = joblib.load(SCALER_PATH)
 le = joblib.load(LABEL_ENCODER_PATH)
 selected_features = joblib.load(SELECTED_FEATURES_PATH)
+feature_stats = joblib.load(os.path.join(ARTIFACT_DIR, "feature_stats_raw.pkl"))
 
 if not isinstance(selected_features, (list, tuple)):
     selected_features = list(selected_features)
@@ -148,12 +150,16 @@ def preprocess_features(feature_dict: Dict[str, float]) -> np.ndarray:
 def root():
     return {"message": "IDS QML API is running"}
 
+@app.get("/feature-stats")
+def get_feature_stats():
+    return feature_stats
+
 @app.post("/predict", response_model=PredictionResponse)
 def predict(req: PredictionRequest):
-    X = preprocess_features(req.features)
-    X_tensor = torch.tensor(X, dtype=torch.float32)
-
     try:
+        X = preprocess_features(req.features)
+        X_tensor = torch.tensor(X, dtype=torch.float32)
+
         with torch.no_grad():
             logits = model(X_tensor)
             probs = torch.softmax(logits, dim=1).cpu().numpy()[0]

@@ -20,3 +20,13 @@ export async function predictTraffic(features: Record<string, number>) {
 
   return (await res.json()) as PredictionResponse;
 }
+
+export async function getFeatureStats() {
+  const res = await fetch("http://localhost:8000/feature-stats");
+
+  if (!res.ok) {
+    throw new Error("Failed to load feature stats");
+  }
+
+  return res.json();
+}

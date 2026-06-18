@@ -13,3 +13,8 @@ uvicorn main:app --reload
 cd frontend/ids-dashboard
 npm install
 npm run dev
+
+### Links
+http://localhost:3000/
+http://localhost:8000/
+http://localhost:8000/docs#/default/predict_predict_post
