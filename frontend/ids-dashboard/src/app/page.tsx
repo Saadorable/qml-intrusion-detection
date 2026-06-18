@@ -14,8 +14,8 @@ export default function Home() {
             Intrusion Detection Dashboard
           </h1>
           <p className="mt-3 max-w-3xl text-sm text-slate-400 sm:text-base">
-            Live traffic simulation, attack injection, prediction monitoring, and
-            packet-level inspection for a production-style IDS interface.
+            Welcome, user. Here you can perform live traffic simulation, attack injection, 
+            prediction monitoring, and packet-level inspection
           </p>
         </div>
 
